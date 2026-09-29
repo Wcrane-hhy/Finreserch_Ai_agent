@@ -1,0 +1,34 @@
+# FinResearch-Agent 运行依赖
+#
+# 生成原则：只列项目代码真正 import 的包，不把整个 Python 环境抄进来。
+# 版本号是本机实测跑通的版本（Python 3.12.10）。
+#
+# 关于 tokenizers / safetensors / huggingface-hub / pydantic / onnxruntime：
+# 它们都是下面这些包的间接依赖（尤其是 transformers 和 chromadb），
+# pip 装的时候会自动带上，所以这里不单独列，免得锁死别人不需要的版本。
+
+# --- HTTP 与网页解析（Financial Tools 调同花顺接口、Web Research 抓网页）---
+requests==2.33.1
+beautifulsoup4==4.14.3
+lxml==6.0.2
+
+# --- 财务指标计算 ---
+pandas==3.0.3
+
+# --- 向量与数值计算 ---
+numpy==2.4.4
+
+# --- Agent 流程编排 ---
+langgraph==1.2.12
+
+# --- RAG：PDF 解析 / 向量库 / Embedding 模型 ---
+PyMuPDF==1.27.2.3
+chromadb==1.5.9
+transformers==5.15.0
+torch==2.11.0
+
+# 说明：Embedding 用的是 BAAI/bge-small-zh-v1.5，
+# 它不是 pip 包，而是 HuggingFace 模型。
+# 代码里写死了离线模式（HF_HUB_OFFLINE=1），
+# 所以这个模型必须已经在本地 HuggingFace 缓存里，否则 rag 相关代码会直接报错。
+# 详见 README 的「环境准备」一节。

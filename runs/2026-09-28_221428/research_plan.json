@@ -1,0 +1,15 @@
+{
+  "research_goal": "查询中际旭创2024年年报中的营业收入和归母净利润",
+  "steps": [
+    {
+      "step": 1,
+      "tool": "search_stock",
+      "purpose": "确认中际旭创的股票代码"
+    },
+    {
+      "step": 2,
+      "tool": "rag_search",
+      "purpose": "检索中际旭创2024年年报原文，获取2024年营业收入和归母净利润的具体数字"
+    }
+  ]
+}

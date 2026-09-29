@@ -1,0 +1,16 @@
+# 统一换行符，避免 Windows / macOS / Linux 交叉提交时
+# 出现"整个文件都被改动"的假 diff。
+#
+# 仓库内统一存 LF；.bat 必须回到 CRLF，否则 Windows 上双击会出怪问题。
+
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不要做任何文本处理
+*.png binary
+*.jpg binary
+*.pdf binary
+*.docx binary
+*.bin binary
+*.sqlite3 binary

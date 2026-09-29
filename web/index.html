@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FinResearch-Agent · 研究流程可视化</title>
+<style>
+/* ============================================================
+   主题变量
+   深浅两套，跟随系统，也可以用右上角按钮手动切换。
+   ============================================================ */
+:root{
+  --bg:#f4f6f8;  --panel:#ffffff; --panel-2:#fafbfc; --line:#e2e6ea;
+  --fg:#171a1f;  --fg-2:#5b636e; --fg-3:#8b939d;
+  --accent:#1f56d6; --accent-soft:#e8eeff;
+  --ok:#0b8a4b; --ok-soft:#e4f6ec;
+  --bad:#d0342c; --bad-soft:#fdeceb;
+  --warn:#a86a00; --warn-soft:#fdf3e0;
+  --code-bg:#f2f4f7;
+  --shadow:0 1px 2px rgba(16,24,40,.05), 0 4px 14px rgba(16,24,40,.05);
+}
+html[data-theme="dark"], html[data-theme="auto"]{
+  /* 由下面 @media 覆盖 */
+}
+@media (prefers-color-scheme: dark){
+  html[data-theme="auto"]{
+    --bg:#101215; --panel:#181b20; --panel-2:#1d2127; --line:#2a2f37;
+    --fg:#e7eaee; --fg-2:#a4adb9; --fg-3:#78828f;
+    --accent:#6b9dff; --accent-soft:#1a2440;
+    --ok:#48c78e; --ok-soft:#15301f;
+    --bad:#ff7b72; --bad-soft:#351d1c;
+    --warn:#e3b341; --warn-soft:#332a15;
+    --code-bg:#111419;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+  }
+}
+html[data-theme="dark"]{
+  --bg:#101215; --panel:#181b20; --panel-2:#1d2127; --line:#2a2f37;
+  --fg:#e7eaee; --fg-2:#a4adb9; --fg-3:#78828f;
+  --accent:#6b9dff; --accent-soft:#1a2440;
+  --ok:#48c78e; --ok-soft:#15301f;
+  --bad:#ff7b72; --bad-soft:#351d1c;
+  --warn:#e3b341; --warn-soft:#332a15;
+  --code-bg:#111419;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 4px 14px rgba(0,0,0,.25);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+code,pre,.mono{font-family:"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace}
+
+/* ============================ 顶栏 ============================ */
+header{
+  position:sticky; top:0; z-index:20;
+  background:var(--panel); border-bottom:1px solid var(--line);
+  padding:12px 20px;
+}
+.hrow{display:flex; align-items:center; gap:14px; max-width:1680px; margin:0 auto}
+.brand{display:flex; align-items:baseline; gap:9px; flex:0 0 auto}
+.brand b{font-size:16px; letter-spacing:.2px}
+.brand span{font-size:12px; color:var(--fg-3)}
+.ask{flex:1 1 auto; display:flex; gap:8px; min-width:0}
+input[type=text]{
+  flex:1 1 auto; min-width:0; padding:9px 12px; font-size:14px;
+  color:var(--fg); background:var(--panel-2);
+  border:1px solid var(--line); border-radius:8px; outline:none;
+}
+input[type=text]:focus{border-color:var(--accent); background:var(--panel)}
+button{
+  font:inherit; cursor:pointer; border-radius:8px; padding:9px 16px;
+  border:1px solid var(--line); background:var(--panel-2); color:var(--fg);
+  transition:filter .12s;
+}
+button:hover:not(:disabled){filter:brightness(.97)}
+button:disabled{opacity:.5; cursor:not-allowed}
+button.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; min-width:92px}
+button.ghost{background:transparent}
+.chips{display:flex; gap:8px; flex-wrap:wrap; max-width:1680px; margin:9px auto 0}
+.chip{
+  font-size:12px; color:var(--fg-2); background:var(--panel-2);
+  border:1px solid var(--line); border-radius:999px; padding:4px 11px; cursor:pointer;
+}
+.chip:hover{border-color:var(--accent); color:var(--accent)}
+
+/* ============================ 主体 ============================ */
+main{
+  display:grid; grid-template-columns:392px minmax(0,1fr); gap:16px;
+  max-width:1680px; margin:0 auto; padding:16px 20px 40px;
+  align-items:start;
+}
+@media (max-width:1080px){ main{grid-template-columns:1fr} }
+.card{
+  background:var(--panel); border:1px solid var(--line);
+  border-radius:12px; box-shadow:var(--shadow); overflow:hidden;
+}
+.card + .card{margin-top:16px}
+.card>h2{
+  margin:0; padding:11px 14px; font-size:13px; font-weight:600;
+  border-bottom:1px solid var(--line); background:var(--panel-2);
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+}
+.card>h2 .sub{font-weight:400; color:var(--fg-3); font-size:12px}
+
+/* ============================ 流程图 ============================ */
+.pipeline{padding:8px 6px 12px}
+.node{
+  display:grid; grid-template-columns:26px 1fr auto; align-items:start;
+  gap:10px; padding:7px 10px; border-radius:8px; position:relative;
+  transition:background .15s;
+}
+.node .dot{
+  width:20px; height:20px; margin-top:1px; border-radius:50%;
+  border:2px solid var(--line); background:var(--panel);
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; color:transparent; z-index:1;
+}
+.node .name{font-weight:600; font-size:13px; display:flex; align-items:center; gap:7px}
+.node .desc{font-size:11.5px; color:var(--fg-3); line-height:1.45}
+.node .meta{font-size:11px; color:var(--fg-3); text-align:right; white-space:nowrap; padding-top:2px}
+.node .tag{
+  font-size:10px; padding:1px 6px; border-radius:999px;
+  background:var(--panel-2); border:1px solid var(--line); color:var(--fg-3); font-weight:500;
+}
+.node .tag.llm{color:var(--accent); border-color:var(--accent-soft); background:var(--accent-soft)}
+.node .tag.loop{color:var(--warn); border-color:var(--warn-soft); background:var(--warn-soft)}
+/* 竖线 */
+.node::before{
+  content:""; position:absolute; left:19px; top:26px; bottom:-7px; width:2px; background:var(--line);
+}
+.node:last-child::before{display:none}
+.node.done::before{background:var(--ok); opacity:.45}
+.node.done .dot{background:var(--ok); border-color:var(--ok); color:#fff}
+.node.done .dot::after{content:"✓"}
+.node.active{background:var(--accent-soft)}
+.node.active .dot{border-color:var(--accent); animation:pulse 1.1s ease-in-out infinite}
+.node.active .name{color:var(--accent)}
+.node.error .dot{background:var(--bad); border-color:var(--bad); color:#fff}
+.node.error .dot::after{content:"!"}
+.node.retry .dot{background:var(--warn-soft); border-color:var(--warn)}
+.node.retry .dot::after{content:"↺"; color:var(--warn)}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 var(--accent)}50%{box-shadow:0 0 0 5px transparent}}
+
+/* ============================ Tool 流水 ============================ */
+.flow{padding:10px; display:flex; flex-direction:column; gap:9px; max-height:520px; overflow:auto}
+.tool{
+  border:1px solid var(--line); border-radius:9px; background:var(--panel-2);
+  padding:9px 11px; border-left:3px solid var(--ok);
+}
+.tool.failed{border-left-color:var(--bad)}
+.tool .th{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.tool .tname{font-weight:600; font-size:13px}
+.tool .badge{
+  font-size:10.5px; padding:1px 7px; border-radius:999px; font-weight:600;
+  background:var(--ok-soft); color:var(--ok);
+}
+.tool.failed .badge{background:var(--bad-soft); color:var(--bad)}
+.tool .time{font-size:11px; color:var(--fg-3); margin-left:auto}
+.tool .args{
+  font-size:11.5px; color:var(--fg-2); margin-top:5px; word-break:break-all;
+  background:var(--code-bg); border-radius:6px; padding:5px 8px;
+}
+.tool .sum{font-size:12.5px; margin-top:6px; color:var(--fg)}
+.tool.failed .sum{color:var(--bad)}
+.tool .cit{
+  margin-top:7px; font-size:11.5px; color:var(--accent);
+  display:flex; align-items:center; gap:6px; cursor:pointer;
+}
+.tool .cit:hover{text-decoration:underline}
+
+/* ============================ 右侧 Tab ============================ */
+.tabs{display:flex; gap:2px; border-bottom:1px solid var(--line); background:var(--panel-2); padding:0 8px}
+.tab{
+  padding:10px 14px; font-size:13px; color:var(--fg-2); cursor:pointer;
+  border-bottom:2px solid transparent; margin-bottom:-1px; background:none; border-radius:0;
+  border-left:0;border-right:0;border-top:0;
+}
+.tab:hover{color:var(--fg)}
+.tab.on{color:var(--accent); border-bottom-color:var(--accent); font-weight:600}
+.pane{display:none; padding:16px 18px; max-height:calc(100vh - 210px); overflow:auto}
+.pane.on{display:block}
+
+/* 报告排版 */
+.report h1,.report h2,.report h3,.report h4{margin:18px 0 8px; line-height:1.35}
+.report h1{font-size:20px} .report h2{font-size:17px} .report h3{font-size:15px} .report h4{font-size:14px}
+.report p{margin:9px 0}
+.report ul,.report ol{margin:9px 0; padding-left:22px}
+.report li{margin:4px 0}
+.report table{border-collapse:collapse; margin:12px 0; font-size:12.5px; width:100%}
+.report th,.report td{border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top}
+.report th{background:var(--panel-2); font-weight:600}
+.report code{background:var(--code-bg); padding:1.5px 5px; border-radius:4px; font-size:12.5px}
+.report pre{background:var(--code-bg); padding:11px; border-radius:8px; overflow:auto}
+.report blockquote{margin:10px 0; padding:4px 12px; border-left:3px solid var(--line); color:var(--fg-2)}
+.report hr{border:0; border-top:1px solid var(--line); margin:16px 0}
+.report a{color:var(--accent)}
+
+/* 证据 */
+.evgroup{margin-bottom:18px}
+.evgroup h3{font-size:13px; margin:0 0 9px; color:var(--fg-2); font-weight:600}
+.ev{
+  border:1px solid var(--line); border-radius:9px; padding:10px 12px;
+  margin-bottom:9px; background:var(--panel-2);
+}
+.ev .eh{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:12.5px}
+.ev .page{
+  font-weight:700; color:var(--accent); background:var(--accent-soft);
+  padding:2px 9px; border-radius:6px; font-size:12px;
+}
+.ev .score{font-size:11px; color:var(--fg-3); margin-left:auto}
+.ev .cid{font-size:11px; color:var(--fg-3)}
+.ev .txt{font-size:12.5px; color:var(--fg-2); margin-top:7px; line-height:1.65; white-space:pre-wrap}
+.ev a{color:var(--accent); font-size:12.5px; word-break:break-all}
+
+/* 日志 */
+#logbox{
+  background:var(--code-bg); border-radius:8px; padding:11px 13px;
+  font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-all; color:var(--fg-2);
+}
+#logbox .err{color:var(--bad)}
+
+/* 状态条 */
+.status{
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  font-size:12px; color:var(--fg-2); padding:9px 16px;
+  border-top:1px solid var(--line); background:var(--panel-2);
+}
+.pill{
+  padding:2px 10px; border-radius:999px; font-size:11.5px; font-weight:600;
+  background:var(--panel); border:1px solid var(--line); color:var(--fg-2);
+}
+.pill.run{background:var(--accent-soft); color:var(--accent); border-color:transparent}
+.pill.ok{background:var(--ok-soft); color:var(--ok); border-color:transparent}
+.pill.bad{background:var(--bad-soft); color:var(--bad); border-color:transparent}
+.pill.warn{background:var(--warn-soft); color:var(--warn); border-color:transparent}
+.empty{color:var(--fg-3); font-size:13px; padding:26px 6px; text-align:center}
+.raw{font-size:11.5px; background:var(--code-bg); border-radius:8px; padding:12px; white-space:pre-wrap; word-break:break-all; max-height:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <div class="brand">
+      <b>FinResearch-Agent</b>
+      <span>Planner → Agent → Tools → Evidence → Reviewer → Report</span>
+    </div>
+    <div class="ask">
+      <input id="q" type="text" placeholder="输入研究问题，例如：中际旭创2024年的营业收入和归母净利润是多少？">
+      <button id="run" class="primary">开始研究</button>
+      <button id="stop" class="ghost" disabled>断开</button>
+    </div>
+    <button id="theme" class="ghost" title="切换深浅色">◐</button>
+  </div>
+  <div class="chips">
+    <span class="chip" data-q="中际旭创2024年的营业收入和归母净利润是多少？">年报数字（应触发 RAG）</span>
+    <span class="chip" data-q="中际旭创最近一个季度的业绩怎么样？">近期业绩（可组合调用）</span>
+    <span class="chip" data-q="中际旭创现在股价是多少？">当前股价（不该翻年报）</span>
+  </div>
+</header>
+
+<main>
+  <!-- ============ 左栏 ============ -->
+  <div>
+    <div class="card">
+      <h2>研究流程 <span class="sub" id="pipeSub">等待开始</span></h2>
+      <div class="pipeline" id="pipeline"></div>
+    </div>
+
+    <div class="card">
+      <h2>Tool 调用流水 <span class="sub" id="toolSub">0 次</span></h2>
+      <div class="flow" id="flow">
+        <div class="empty">Agent 自主决定调用哪些 Tool，结果会实时出现在这里</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 右栏 ============ -->
+  <div class="card">
+    <div class="tabs">
+      <button class="tab on" data-pane="p-report">最终报告</button>
+      <button class="tab" data-pane="p-ev">证据来源 <span id="evCount"></span></button>
+      <button class="tab" data-pane="p-log">运行日志</button>
+      <button class="tab" data-pane="p-raw">原始数据</button>
+    </div>
+
+    <div class="pane on" id="p-report">
+      <div id="report" class="report"><div class="empty">还没有报告</div></div>
+    </div>
+
+    <div class="pane" id="p-ev">
+      <div id="evidence"><div class="empty">还没有证据</div></div>
+    </div>
+
+    <div class="pane" id="p-log">
+      <div id="logbox">（暂无输出）</div>
+    </div>
+
+    <div class="pane" id="p-raw">
+      <div id="raw" class="raw">（暂无数据）</div>
+    </div>
+
+    <div class="status">
+      <span class="pill" id="s-state">空闲</span>
+      <span id="s-time">用时 0.0s</span>
+      <span id="s-round">Tool 轮数 —</span>
+      <span id="s-review">Reviewer —</span>
+      <span id="s-retry">补充研究 0 次</span>
+      <span id="s-dir" class="mono" style="color:var(--fg-3)"></span>
+    </div>
+  </div>
+</main>
+
+<script>
+/* ============================================================
+   0. 主题切换
+   ============================================================ */
+const html = document.documentElement;
+document.getElementById('theme').onclick = () => {
+  const order = ['auto','light','dark'];
+  const next = order[(order.indexOf(html.dataset.theme) + 1) % order.length];
+  html.dataset.theme = next;
+  localStorage.setItem('fra-theme', next);
+};
+const savedTheme = localStorage.getItem('fra-theme');
+if (savedTheme) html.dataset.theme = savedTheme;
+
+/* ============================================================
+   1. 迷你 Markdown 渲染
+   报告是 Markdown 写的。为了不引 CDN（离线也要能用），
+   这里只实现报告里真的会出现的语法：标题 / 粗体 / 行内代码 /
+   列表 / 表格 / 引用 / 分隔线。
+   ============================================================ */
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function inline(s){
+  return esc(s)
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g,'$1<em>$2</em>');
+}
+function splitRow(line){
+  return line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(s=>s.trim());
+}
+function mdToHtml(md){
+  const lines = String(md).replace(/\r/g,'').split('\n');
+  const out = [];
+  let i = 0;
+  while (i < lines.length){
+    const line = lines[i];
+    if (/^\s*$/.test(line)) { i++; continue; }
+
+    // 表格
+    if (/^\s*\|/.test(line) && i+1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i+1])){
+      const head = splitRow(line); i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|/.test(lines[i])) { rows.push(splitRow(lines[i])); i++; }
+      out.push('<table><thead><tr>' + head.map(h=>'<th>'+inline(h)+'</th>').join('') +
+        '</tr></thead><tbody>' + rows.map(r=>'<tr>'+r.map(c=>'<td>'+inline(c)+'</td>').join('')+'</tr>').join('') +
+        '</tbody></table>');
+      continue;
+    }
+    // 标题
+    let m = line.match(/^(#{1,6})\s+(.*)$/);
+    if (m){ const n = m[1].length; out.push('<h'+n+'>'+inline(m[2])+'</h'+n+'>'); i++; continue; }
+    // 分隔线
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)){ out.push('<hr>'); i++; continue; }
+    // 列表
+    if (/^\s*([-*+]|\d+\.)\s+/.test(line)){
+      const ordered = /^\s*\d+\./.test(line);
+      const items = [];
+      while (i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i])){
+        items.push(inline(lines[i].replace(/^\s*([-*+]|\d+\.)\s+/,''))); i++;
+      }
+      const tag = ordered ? 'ol' : 'ul';
+      out.push('<'+tag+'>'+items.map(x=>'<li>'+x+'</li>').join('')+'</'+tag+'>');
+      continue;
+    }
+    // 引用
+    if (/^\s*>\s?/.test(line)){
+      const q = [];
+      while (i < lines.length && /^\s*>\s?/.test(lines[i])){ q.push(inline(lines[i].replace(/^\s*>\s?/,''))); i++; }
+      out.push('<blockquote>'+q.join('<br>')+'</blockquote>');
+      continue;
+    }
+    // 段落
+    const p = [];
+    while (i < lines.length && !/^\s*$/.test(lines[i]) &&
+           !/^\s*(#{1,6}\s|\||>\s?|[-*+]\s|\d+\.\s|-{3,})/.test(lines[i])){
+      p.push(inline(lines[i])); i++;
+    }
+    out.push('<p>'+p.join('<br>')+'</p>');
+  }
+  return out.join('');
+}
+
+/* ============================================================
+   2. 页面状态
+   ============================================================ */
+const $ = id => document.getElementById(id);
+let es = null, finished = false, t0 = 0, ticker = null;
+let state = {
+  nodes: [], counts: {}, citations: [], logs: [], steps: [], review: null, raw: {},
+  // 当前正在跑的节点名。用单独一个变量记，而不是往 class 字符串里塞 'active' ——
+  // 因为 prepare_retry 走的是回边，它的 class 是 'retry active'，
+  // 早先版本用 x.cls === 'active' 判断"上一个节点"，回边节点永远收不了尾，
+  // 圆形进度点会一直闪着。这个坑是写完后复查发现的。
+  activeName: null
+};
+
+function resetAll(){
+  state = { nodes: [], counts: {}, citations: [], logs: [], steps: [], review: null, raw: {}, activeName: null };
+  $('flow').innerHTML = '<div class="empty">Agent 自主决定调用哪些 Tool，结果会实时出现在这里</div>';
+  $('report').innerHTML = '<div class="empty">正在研究…</div>';
+  $('evidence').innerHTML = '<div class="empty">还没有证据</div>';
+  $('logbox').textContent = '';
+  $('raw').textContent = '';
+  $('evCount').textContent = '';
+  $('toolSub').textContent = '0 次';
+  $('pipeSub').textContent = '运行中';
+  $('s-dir').textContent = '';
+  $('s-round').textContent = 'Tool 轮数 —';
+  $('s-review').textContent = 'Reviewer —';
+  $('s-review').className = 'pill';
+  $('s-retry').textContent = '补充研究 0 次';
+  setState('运行中', 'run');
+}
+
+function setState(text, cls){
+  const el = $('s-state');
+  el.textContent = text;
+  el.className = 'pill' + (cls ? ' ' + cls : '');
+}
+
+/* ============================================================
+   3. 左侧流程图
+   ============================================================ */
+function renderPipeline(){
+  $('pipeline').innerHTML = state.nodes.map(n => {
+    const cnt = state.counts[n.name] || 0;
+    const tags = [];
+    if (n.llm) tags.push('<span class="tag llm">LLM</span>');
+    if (cnt > 1) tags.push('<span class="tag loop">×' + cnt + '</span>');
+    // class 由「这个节点的静止状态」+「它是不是当前节点」拼出来。
+    // 两者分开存，就不会互相覆盖 —— 见上面 state.activeName 的注释。
+    const cls = [];
+    if (n.stateCls) cls.push(n.stateCls);
+    if (state.activeName === n.name) cls.push('active');
+    return '<div class="node ' + cls.join(' ') + '" id="node-' + n.name + '">' +
+      '<div class="dot"></div>' +
+      '<div><div class="name">' + esc(n.label) + tags.join('') + '</div>' +
+      '<div class="desc">' + esc(n.desc) + '</div></div>' +
+      '<div class="meta">' + esc(n.meta || '') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function nodeStep(name, meta){
+  const n = state.nodes.find(x => x.name === name);
+  if (!n) return;
+  // 上一个节点收尾
+  if (state.activeName){
+    const prev = state.nodes.find(x => x.name === state.activeName);
+    if (prev && !prev.stateCls) prev.stateCls = 'done';
+  }
+  state.activeName = name;
+  n.meta = meta || '';
+  // prepare_retry 是回边，用另一种颜色标出来，让人看得见"图绕回来了一圈"
+  if (name === 'prepare_retry') n.stateCls = 'retry';
+  state.counts[name] = (state.counts[name] || 0) + 1;
+  renderPipeline();
+  const el = $('node-' + name);
+  if (el) el.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+
+function nodeFinishAll(){
+  state.activeName = null;
+  state.nodes.forEach(n => { if (!n.stateCls) n.stateCls = 'done'; });
+  renderPipeline();
+}
+
+/* ============================================================
+   4. 左侧 Tool 流水
+   ============================================================ */
+function addTool(ev){
+  // 只在"还没有任何卡片"时清掉占位文案。
+  // 早先版本用的是 state.citations.length === 0，
+  // 但有些 Tool（比如 search_stock）本来就不产生引用，
+  // 于是第二张卡片一来会把第一张擦掉。改成看 DOM 里有没有卡片。
+  if (!$('flow').querySelector('.tool')) $('flow').innerHTML = '';
+  const args = ev.arguments ? JSON.stringify(ev.arguments) : '';
+  const ok = ev.status === 'success';
+  const div = document.createElement('div');
+  div.className = 'tool' + (ok ? '' : ' failed');
+  div.innerHTML =
+    '<div class="th"><span class="tname">' + esc(ev.tool) + '</span>' +
+      '<span class="badge">' + (ok ? '成功' : '失败') + '</span>' +
+      '<span class="time">' + (ev.elapsed != null ? esc(ev.elapsed) + 's' : '') + '</span></div>' +
+    (args ? '<div class="args">' + esc(args) + '</div>' : '') +
+    '<div class="sum">' + esc(ev.summary || '') + '</div>' +
+    ((ev.citations && ev.citations.length)
+      ? '<div class="cit" data-tab="p-ev">↳ ' + ev.citations.length + ' 条可追溯来源，点击查看</div>'
+      : '');
+  $('flow').appendChild(div);
+
+  state.citations = state.citations.concat(ev.citations || []);
+  $('toolSub').textContent = ($('flow').querySelectorAll('.tool').length) + ' 次';
+  $('evCount').textContent = state.citations.length ? '(' + state.citations.length + ')' : '';
+  div.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+
+/* ============================================================
+   5. 右侧证据面板
+   ============================================================ */
+function renderEvidence(){
+  if (!state.citations.length){
+    $('evidence').innerHTML = '<div class="empty">还没有证据</div>';
+    return;
+  }
+  const pdf = state.citations.filter(c => c.kind === 'pdf');
+  const web = state.citations.filter(c => c.kind === 'web');
+  let html = '';
+
+  if (pdf.length){
+    html += '<div class="evgroup"><h3>年报原文证据（' + pdf.length + ' 段，可追溯到页码）</h3>';
+    html += pdf.map(c =>
+      '<div class="ev"><div class="eh">' +
+        '<span class="page">第 ' + esc(c.page) + ' 页</span>' +
+        '<span class="cid">' + esc(c.chunk_id || '') + '</span>' +
+        '<span class="score">' + (c.score != null ? 'score ' + c.score : '') + '</span>' +
+      '</div><div class="txt">' + esc(c.preview || '') + '</div></div>').join('');
+    html += '</div>';
+  }
+  if (web.length){
+    html += '<div class="evgroup"><h3>网络来源（' + web.length + ' 条）</h3>';
+    html += web.map(c =>
+      '<div class="ev"><div class="eh">' +
+        '<span class="page">' + esc(c.label || '') + '</span>' +
+        (c.title ? '<span class="cid">' + esc(c.title) + '</span>' : '') +
+      '</div>' +
+      (c.url ? '<div style="margin-top:6px"><a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.url) + '</a></div>' : '') +
+      '<div class="txt">' + esc(c.preview || '') + '</div></div>').join('');
+    html += '</div>';
+  }
+  $('evidence').innerHTML = html;
+}
+
+/* ============================================================
+   6. 日志与原始数据
+   ============================================================ */
+function addLog(line){
+  state.logs.push(line);
+  const box = $('logbox');
+  box.textContent = state.logs.join('\n');
+  box.scrollTop = box.scrollHeight;
+  // 只留最近 400 行，防止页面越来越卡
+  if (state.logs.length > 400){ state.logs = state.logs.slice(-400); }
+}
+
+function renderRaw(){
+  $('raw').textContent = JSON.stringify(state.raw, null, 2);
+}
+
+/* ============================================================
+   7. SSE 主循环
+   ============================================================ */
+function run(){
+  const q = $('q').value.trim();
+  if (!q){ $('q').focus(); return; }
+  if (es) es.close();
+
+  resetAll();
+  finished = false;
+  // 真实的节点清单由 start 事件带过来，这里先清空，避免上一轮的残留
+  state.nodes = [];
+  renderPipeline();
+
+  t0 = Date.now();
+  clearInterval(ticker);
+  ticker = setInterval(() => {
+    $('s-time').textContent = '用时 ' + ((Date.now() - t0)/1000).toFixed(1) + 's';
+  }, 200);
+
+  $('run').disabled = true;
+  $('stop').disabled = false;
+
+  es = new EventSource('/api/stream?q=' + encodeURIComponent(q));
+
+  es.onmessage = e => {
+    let ev;
+    try { ev = JSON.parse(e.data); } catch (err) { return; }
+    handle(ev);
+  };
+  es.onerror = () => {
+    if (finished) return;
+    finished = true;
+    es.close();
+    setState('连接中断', 'bad');
+    $('run').disabled = false;
+    $('stop').disabled = true;
+    clearInterval(ticker);
+    nodeFinishAll();
+  };
+}
+
+function handle(ev){
+  switch (ev.type){
+    case 'start':
+      // 保留服务端给的 name/label/desc/llm，补上界面需要的状态字段
+      state.nodes = ev.nodes.map(n => ({
+        name: n.name, label: n.label, desc: n.desc, llm: n.llm,
+        stateCls: '', meta: ''
+      }));
+      state.raw = {question: ev.question, available_tools: ev.tools, nodes: []};
+      renderPipeline();
+      $('pipeSub').textContent = '运行中';
+      break;
+
+    case 'node':
+      nodeStep(ev.node, ev.elapsed + 's');
+      state.raw.nodes = state.raw.nodes || [];
+      state.raw.nodes.push({node: ev.node, seq: ev.seq, elapsed: ev.elapsed});
+      renderRaw();
+      break;
+
+    case 'plan':
+      state.raw.research_plan = ev.plan;
+      addLog('【Planner】研究计划：' + JSON.stringify(ev.plan, null, 0).slice(0, 300));
+      renderRaw();
+      break;
+
+    case 'agent_step':
+      state.steps.push(ev);
+      state.raw.agent_steps = state.steps;
+      addLog(ev.done
+        ? '【Agent】第 ' + ev.round + ' 轮后判断资料已够，停止调用 Tool'
+        : '【Agent】第 ' + ev.round + ' 轮决定调用：' + ev.tool_calls.join(', '));
+      if (ev.text) addLog('        ' + ev.text.slice(0, 160));
+      renderRaw();
+      break;
+
+    case 'tool':
+      addTool(ev);
+      addLog('【Tool】' + ev.tool + ' [' + ev.status + '] ' + (ev.summary || ''));
+      renderEvidence();
+      state.raw.tool_results = state.raw.tool_results || [];
+      state.raw.tool_results.push({tool: ev.tool, status: ev.status, arguments: ev.arguments, summary: ev.summary});
+      renderRaw();
+      break;
+
+    case 'evidence':
+      state.raw.evidence = ev;
+      addLog('【Evidence】整理出 ' + (ev.steps || []).length + ' 步证据'
+             + ((ev.limitations || []).length ? '，数据局限 ' + ev.limitations.length + ' 条' : ''));
+      renderRaw();
+      break;
+
+    case 'review':
+      state.review = ev;
+      state.raw.review = ev;
+      const el = $('s-review');
+      el.textContent = 'Reviewer ' + (ev.status || '—');
+      el.className = 'pill ' + (ev.status === 'PASS' ? 'ok' : 'bad');
+      addLog('【Reviewer】' + ev.status + (ev.verdict ? ' — ' + ev.verdict.slice(0, 200) : ''));
+      (ev.issues || []).forEach(x => addLog('   issue: ' + String(x).slice(0, 180)));
+      (ev.unsupported_claims || []).forEach(x => addLog('   缺证据: ' + String(x).slice(0, 180)));
+      renderRaw();
+      break;
+
+    case 'retry':
+      $('s-retry').textContent = '补充研究 ' + ev.count + ' 次';
+      addLog('【Retry】Reviewer 判 FAIL，触发补充研究（第 ' + ev.count + '/' + ev.max + ' 次）');
+      break;
+
+    case 'report':
+      $('report').innerHTML = mdToHtml(ev.text);
+      state.raw.final_answer = ev.text;
+      renderRaw();
+      break;
+
+    case 'save':
+      $('s-dir').textContent = ev.run_dir;
+      state.raw.run_dir = ev.run_dir;
+      addLog('【Save】结果已落盘：' + ev.run_dir);
+      renderRaw();
+      break;
+
+    case 'log':
+      addLog(ev.line);
+      break;
+
+    case 'done': {
+      finished = true;
+      clearInterval(ticker);
+      $('s-time').textContent = '用时 ' + ev.elapsed + 's';
+      $('s-round').textContent = 'Tool 轮数 ' + (ev.tool_round != null ? ev.tool_round : '—');
+      $('s-retry').textContent = '补充研究 ' + (ev.retry_count || 0) + ' 次';
+      state.raw.done = ev;
+      renderRaw();
+      const ok = ev.review && ev.review.status === 'PASS';
+      setState(ok ? '完成 · 审核通过' : '完成 · 审核 ' + ((ev.review && ev.review.status) || '—'), ok ? 'ok' : 'warn');
+      $('pipeSub').textContent = '已完成';
+      if (es) es.close();
+      $('run').disabled = false;
+      $('stop').disabled = true;
+      nodeFinishAll();
+      break;
+    }
+
+    case 'error':
+      finished = true;
+      addLog('【错误】' + ev.message);
+      setState('出错', 'bad');
+      if (!$('report').innerHTML || $('report').querySelector('.empty')){
+        $('report').innerHTML = '<div class="empty" style="color:var(--bad)">' + esc(ev.message) + '</div>';
+      }
+      if (es) es.close();
+      $('run').disabled = false;
+      $('stop').disabled = true;
+      clearInterval(ticker);
+      break;
+
+    case 'eof':
+      if (!finished){ finished = true; if (es) es.close(); }
+      break;
+  }
+}
+
+/* ============================================================
+   8. 交互绑定
+   ============================================================ */
+$('run').onclick = run;
+$('q').addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
+$('stop').onclick = () => {
+  if (es) es.close();
+  finished = true;
+  clearInterval(ticker);
+  setState('已断开（服务端仍会跑完并落盘）', 'warn');
+  $('run').disabled = false;
+  $('stop').disabled = true;
+};
+document.querySelectorAll('.chip').forEach(c => {
+  c.onclick = () => { $('q').value = c.dataset.q; };
+});
+document.querySelectorAll('.tab').forEach(t => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+    $(t.dataset.pane).classList.add('on');
+  };
+});
+// Tool 卡片上的"查看来源"按钮 → 跳证据 Tab
+document.addEventListener('click', e => {
+  const c = e.target.closest('.cit');
+  if (!c) return;
+  document.querySelector('.tab[data-pane="p-ev"]').click();
+});
+
+// 打开页面时画一次空骨架，顺便探一下后端在不在
+fetch('/api/health').then(r => r.json()).then(() => {}).catch(() => {});
+
+// 支持用 URL 直接指定问题，方便把某一次研究做成一条直达链接：
+//   http://127.0.0.1:8765/?q=中际旭创2024年的营业收入是多少&auto=1
+// 刻意区分两个参数：不带 auto=1 只预填问题、不自动跑
+// （否则别人点开链接就被扣一次 API 费用，不礼貌）。
+(function(){
+  const p = new URLSearchParams(location.search);
+  const q = p.get('q');
+  if (!q) return;
+  $('q').value = q;
+  if (p.get('auto') === '1') run();
+})();
+</script>
+</body>
+</html>
