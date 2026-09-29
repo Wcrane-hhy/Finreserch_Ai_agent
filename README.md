@@ -173,7 +173,7 @@ flowchart TD
     R -->|"FAIL 且尚未补过"| PR["prepare_retry<br/>补充研究"]
     PR --> A
     F --> S["Save"]
-    S --> OUT([runs/&lt;时间戳&gt;/report.md])
+    S --> OUT(["runs/时间戳/report.md"])
 
     style R fill:#fff3cd,stroke:#d39e00
     style PR fill:#f8d7da,stroke:#c82333
