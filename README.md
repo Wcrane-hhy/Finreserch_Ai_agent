@@ -60,8 +60,8 @@
 ### 1. 装依赖
 
 ```bash
-git clone https://github.com/Wcrane-hhy/FinResearch-Agent.git
-cd FinResearch-Agent
+git clone https://github.com/Wcrane-hhy/Finreserch_Ai_agent.git
+cd Finreserch_Ai_agent
 
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
